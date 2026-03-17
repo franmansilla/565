@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { MdArrowBack, MdAdd, MdSwapHoriz, MdCheck, MdPriorityHigh, MdChevronRight, MdAccessTime, MdWarning } from 'react-icons/md'
-import { getBeneficiario, getPagosByBeneficiario, getHistorialRama, getCuotasPendientesByBeneficiario, getEstadoCuenta } from '@/lib/data'
+import { getBeneficiario, getPagosByBeneficiario, getHistorialRama, getCuotasPendientesByBeneficiario, getEstadoCuenta, getInscripcionesByBeneficiario } from '@/lib/data'
 import { EstadoCuentaView } from '@/components/EstadoCuenta'
-import { deleteBeneficiario } from '@/lib/actions'
+import { deleteBeneficiario, desInscribirCampamento } from '@/lib/actions'
 import {
   RAMA_COLORS, ESTADO_PAGO_STYLES, MESES, MESES_SCOUT,
   calcularEstadoPago, type Rama, type EstadoPago,
@@ -15,12 +15,13 @@ export default async function ProtagonistDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const [protagonista, pagos, historialRama, cuotasPendientes, estadoCuenta] = await Promise.all([
+  const [protagonista, pagos, historialRama, cuotasPendientes, estadoCuenta, inscripciones] = await Promise.all([
     getBeneficiario(id),
     getPagosByBeneficiario(id),
     getHistorialRama(id),
     getCuotasPendientesByBeneficiario(id),
     getEstadoCuenta(id),
+    getInscripcionesByBeneficiario(id),
   ])
 
   const deleteWithId = deleteBeneficiario.bind(null, id)
@@ -83,9 +84,6 @@ export default async function ProtagonistDetailPage({
           </Link>
           <Link href={`/protagonistas/${id}/editar`} className="border border-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium">
             Editar
-          </Link>
-          <Link href={`/protagonistas/${id}/inscribir-campamento`} className="inline-flex items-center gap-1.5 border border-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium">
-            <MdAdd size={16} /> Inscribir Campamento
           </Link>
           <Link href={`/pagos/nuevo?beneficiario=${id}`} className="inline-flex items-center gap-1.5 bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium">
             <MdAdd size={16} /> Registrar Pago
@@ -171,6 +169,38 @@ export default async function ProtagonistDetailPage({
                       <span className={`font-semibold ${vencida ? 'text-red-800' : 'text-amber-800'}`}>
                         ${Number(cp.monto).toLocaleString('es-AR')}
                       </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Campamentos inscritos */}
+          {inscripciones.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Campamentos</h2>
+              <div className="space-y-2">
+                {inscripciones.map((insc) => {
+                  const camp = insc.campamentos as unknown as { id: string; nombre: string; activo: boolean }
+                  const desinscribir = desInscribirCampamento.bind(null, insc.id, id, camp.id)
+                  return (
+                    <div key={insc.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-slate-800">{camp.nombre}</p>
+                        <p className="text-xs text-slate-500">
+                          ${Number(insc.monto).toLocaleString('es-AR')}
+                          {!camp.activo && <span className="ml-1 text-slate-400">(inactivo)</span>}
+                        </p>
+                      </div>
+                      <form action={desinscribir}>
+                        <button
+                          type="submit"
+                          className="text-xs text-red-500 hover:text-red-700 hover:underline transition-colors"
+                        >
+                          Desinscribir
+                        </button>
+                      </form>
                     </div>
                   )
                 })}

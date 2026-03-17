@@ -201,17 +201,41 @@ export async function createPago(formData: FormData) {
 
 export async function createCampamento(formData: FormData) {
   const supabase = await createServerClient()
-  const { error } = await supabase.from('campamentos').insert({
-    nombre: formData.get('nombre') as string,
-    fecha_inicio: formData.get('fecha_inicio') as string,
-    fecha_fin: formData.get('fecha_fin') as string,
-    precio_estimado: parseFloat(formData.get('precio_estimado') as string) || null,
-    rama: formData.get('rama') as string,
-    descripcion: (formData.get('descripcion') as string) || null,
-    activo: true,
-  })
+  const rama = formData.get('rama') as string
+  const precioEstimado = parseFloat(formData.get('precio_estimado') as string) || 0
+
+  const { data: camp, error } = await supabase
+    .from('campamentos')
+    .insert({
+      nombre: formData.get('nombre') as string,
+      fecha_inicio: formData.get('fecha_inicio') as string,
+      fecha_fin: formData.get('fecha_fin') as string,
+      precio_estimado: precioEstimado || null,
+      rama,
+      descripcion: (formData.get('descripcion') as string) || null,
+      activo: true,
+    })
+    .select('id')
+    .single()
   if (error) dbError(error)
+
+  // Auto-inscribir protagonistas activos de la rama correspondiente
+  let query = supabase.from('beneficiarios').select('id').eq('activo', true)
+  if (rama !== 'Ambas') query = query.eq('rama', rama)
+  const { data: protagonistas } = await query
+
+  if (protagonistas?.length) {
+    await supabase.from('inscripciones_campamento').insert(
+      protagonistas.map((p) => ({
+        beneficiario_id: p.id,
+        campamento_id: camp!.id,
+        monto: precioEstimado,
+      }))
+    )
+  }
+
   revalidatePath('/campamentos')
+  revalidatePath('/protagonistas')
   revalidatePath('/')
   redirect('/campamentos')
 }

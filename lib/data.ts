@@ -392,6 +392,17 @@ export async function getEstadoCuenta(beneficiarioId: string): Promise<EstadoCue
 // CUOTAS PENDIENTES
 // ============================================================
 
+export async function getInscripcionesByBeneficiario(beneficiarioId: string) {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('inscripciones_campamento')
+    .select('id, monto, notas, created_at, campamento_id, campamentos(id, nombre, fecha_inicio, fecha_fin, activo)')
+    .eq('beneficiario_id', beneficiarioId)
+    .order('created_at', { ascending: false })
+  if (error) dbError(error)
+  return data || []
+}
+
 export async function getCuotasPendientesByBeneficiario(beneficiarioId: string) {
   const supabase = await createServerClient()
   const { data, error } = await supabase
