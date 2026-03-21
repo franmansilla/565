@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import { MdArrowBack, MdAdd, MdSwapHoriz, MdCheck, MdPriorityHigh, MdChevronRight, MdAccessTime, MdWarning } from 'react-icons/md'
+import { FaWhatsapp, FaEnvelope } from 'react-icons/fa'
 import { getBeneficiario, getPagosByBeneficiario, getHistorialRama, getCuotasPendientesByBeneficiario, getEstadoCuenta, getInscripcionesByBeneficiario, getDocumentosByProtagonista } from '@/lib/data'
 import { EstadoCuentaView } from '@/components/EstadoCuenta'
-import { deleteBeneficiario, desInscribirCampamento } from '@/lib/actions'
+import { deleteBeneficiario, desInscribirCampamento, enviarEmailCuotaVencida } from '@/lib/actions'
 import { DocumentosSection } from '@/components/DocumentosSection'
 import {
   RAMA_COLORS, ESTADO_PAGO_STYLES, MESES, MESES_SCOUT,
@@ -155,6 +156,7 @@ export default async function ProtagonistDetailPage({
                 {cuotasPendientes.filter(cp => cp.estado !== 'pagado').map((cp) => {
                   const vencida = cp.estado === 'vencido'
                   const vto = new Date(cp.fecha_vencimiento + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                  const wspHref = vencida ? buildWhatsappLink(protagonista, cp, vto) : null
                   return (
                     <div key={cp.id} className={`flex items-start justify-between p-2.5 rounded-lg text-xs ${vencida ? 'bg-red-50 border border-red-100' : 'bg-amber-50 border border-amber-100'}`}>
                       <div>
@@ -168,9 +170,33 @@ export default async function ProtagonistDetailPage({
                           Vence {vto}
                         </div>
                       </div>
-                      <span className={`font-semibold ${vencida ? 'text-red-800' : 'text-amber-800'}`}>
-                        ${Number(cp.monto).toLocaleString('es-AR')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-semibold ${vencida ? 'text-red-800' : 'text-amber-800'}`}>
+                          ${Number(cp.monto).toLocaleString('es-AR')}
+                        </span>
+                        {wspHref && (
+                          <a
+                            href={wspHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Notificar por WhatsApp"
+                            className="text-green-600 hover:text-green-800 transition-colors"
+                          >
+                            <FaWhatsapp size={16} />
+                          </a>
+                        )}
+                        {vencida && (protagonista.mail_contacto || protagonista.email) && (
+                          <form action={enviarEmailCuotaVencida.bind(null, cp.id, id)}>
+                            <button
+                              type="submit"
+                              title="Notificar por email"
+                              className="text-blue-500 hover:text-blue-700 transition-colors cursor-pointer"
+                            >
+                              <FaEnvelope size={15} />
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
@@ -318,4 +344,30 @@ function InfoItem({ label, value }: { label: string; value: string }) {
       <dd className="text-slate-800 mt-0.5 text-sm">{value}</dd>
     </div>
   )
+}
+
+function buildWhatsappLink(
+  protagonista: { nombre: string; apellido: string; telefono?: string; telefono_contacto?: string },
+  cp: { tipo: string; meses_cubiertos: string[]; monto: number },
+  vto: string,
+) {
+  const rawPhone = protagonista.telefono_contacto || protagonista.telefono
+  if (!rawPhone) return null
+
+  // Normalizar número argentino: quitar caracteres no numéricos, agregar código de país 54
+  const digits = rawPhone.replace(/\D/g, '')
+  const phone = digits.startsWith('54') ? digits : `54${digits.replace(/^0/, '')}`
+
+  const meses = cp.meses_cubiertos
+    .map((m: string) => MESES[parseInt(m.split('-')[1]) - 1])
+    .join(', ')
+
+  const mensaje =
+    `Hola! Te contactamos del *Grupo Scout 565*. ` +
+    `Queremos avisarte que ${protagonista.nombre} ${protagonista.apellido} tiene una cuota *vencida*: ` +
+    `cuota ${cp.tipo} (${meses}) por *$${Number(cp.monto).toLocaleString('es-AR')}*, ` +
+    `con fecha de vencimiento ${vto}. ` +
+    `Por favor regularizá la situación a la brevedad. ¡Gracias!`
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(mensaje)}`
 }

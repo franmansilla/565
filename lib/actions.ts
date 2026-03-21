@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createServerClient } from './supabase/server'
 import { createAdminClient } from './supabase/admin'
 import type { Rama, MetodoPago, TipoPago, TipoCuota, RolUsuario } from './types'
+import { enviarVencimientoCuota } from './email'
 
 function dbError(error: { message: string; hint?: string }): never {
   throw new Error(
@@ -421,4 +422,29 @@ export async function updateCampamento(id: string, formData: FormData) {
   revalidatePath('/campamentos')
   revalidatePath(`/campamentos/${id}`)
   redirect(`/campamentos/${id}`)
+}
+
+// ============================================================
+// EMAIL
+// ============================================================
+
+export async function enviarEmailCuotaVencida(cuotaId: string, protagonistaId: string) {
+  const supabase = createAdminClient()
+
+  const { data: cp } = await supabase
+    .from('cuotas_pendientes')
+    .select('tipo, meses_cubiertos, monto, fecha_vencimiento')
+    .eq('id', cuotaId)
+    .single()
+
+  const { data: protagonista } = await supabase
+    .from('beneficiarios')
+    .select('nombre, apellido, email, mail_contacto')
+    .eq('id', protagonistaId)
+    .single()
+
+  if (!cp || !protagonista) throw new Error('Datos no encontrados')
+
+  const enviado = await enviarVencimientoCuota(protagonista, cp)
+  if (!enviado) throw new Error('No se pudo enviar el email (sin dirección de correo)')
 }

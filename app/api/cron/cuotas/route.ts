@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { enviarAvisoCuota, enviarVencimientoCuota } from '@/lib/email'
 
 // Trimestrales: se generan el 1ro del primer mes, vencen el 10 del segundo mes
 const TRIMESTRES = [
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
   const mes = now.getMonth() + 1
   const anio = now.getFullYear()
 
-  const MESES_SCOUT = [4, 5, 6, 7, 8, 9, 10, 11]
+  const MESES_SCOUT = [3,4, 5, 6, 7, 8, 9, 10, 11]
   if (!MESES_SCOUT.includes(mes)) {
     return NextResponse.json({
       message: `Mes ${mes} fuera del período scout (abril-noviembre). Sin cuotas generadas.`,
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
   // Protagonistas activos
   const { data: protagonistas } = await supabase
     .from('beneficiarios')
-    .select('id, tipo_cuota')
+    .select('id, tipo_cuota, nombre, apellido, email, mail_contacto')
     .eq('activo', true)
 
   if (!protagonistas?.length) {
@@ -75,14 +76,16 @@ export async function GET(request: NextRequest) {
         .maybeSingle()
 
       if (!existing) {
-        await supabase.from('cuotas_pendientes').insert({
+        const nuevaCuota = {
           beneficiario_id: p.id,
           tipo: 'mensual',
           meses_cubiertos: [mesClave],
           monto: Number(cuota.monto),
           fecha_vencimiento: `${anio}-${pad(mes)}-10`,
-        })
+        }
+        await supabase.from('cuotas_pendientes').insert(nuevaCuota)
         created++
+        await enviarAvisoCuota(p, nuevaCuota)
       }
     } else if (tipoCuota === 'trimestral' && trimestreActual) {
       // Solo se genera en los meses de inicio de trimestre
@@ -100,27 +103,42 @@ export async function GET(request: NextRequest) {
         const mesesCubiertos = trimestreActual.meses.map((m) => `${anio}-${pad(m)}`)
         const montoTrimestral =
           Number(cuota.monto_trimestral_mes || cuota.monto) * trimestreActual.meses.length
-
-        await supabase.from('cuotas_pendientes').insert({
+        const nuevaCuota = {
           beneficiario_id: p.id,
           tipo: 'trimestral',
           meses_cubiertos: mesesCubiertos,
           monto: montoTrimestral,
           fecha_vencimiento: `${anio}-${pad(trimestreActual.segundoMes)}-10`,
-        })
+        }
+        await supabase.from('cuotas_pendientes').insert(nuevaCuota)
         created++
+        await enviarAvisoCuota(p, nuevaCuota)
       }
     }
     // Trimestral en mes que no es inicio de trimestre: no se genera nada
   }
 
-  // Marcar vencidas: pendientes con fecha_vencimiento < hoy
+  // Marcar vencidas y notificar
   const hoy = now.toISOString().split('T')[0]
-  await supabase
+  const { data: recienVencidas } = await supabase
     .from('cuotas_pendientes')
-    .update({ estado: 'vencido' })
+    .select('id, tipo, meses_cubiertos, monto, fecha_vencimiento, beneficiarios:beneficiario_id(nombre, apellido, email, mail_contacto)')
     .eq('estado', 'pendiente')
     .lt('fecha_vencimiento', hoy)
+
+  if (recienVencidas?.length) {
+    await supabase
+      .from('cuotas_pendientes')
+      .update({ estado: 'vencido' })
+      .in('id', recienVencidas.map((c) => c.id))
+
+    for (const cp of recienVencidas) {
+      const protagonista = cp.beneficiarios as unknown as { nombre: string; apellido: string; email?: string; mail_contacto?: string }
+      if (protagonista) {
+        await enviarVencimientoCuota(protagonista, cp)
+      }
+    }
+  }
 
   return NextResponse.json({
     message: `Cron ejecutado: ${created} cuota(s) generada(s)`,
