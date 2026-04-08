@@ -12,13 +12,39 @@
   --font-sans: var(--font-geist-sans);
 }
 
-/* Colores de marca con valores estáticos — usan @theme sin 'inline' */
+/* Colores de marca admin */
 @theme {
   --color-primary:         #2085ee;
   --color-primary-dark:    #1870cc;
   --color-primary-light:   #eff6ff;
   --color-brand-red:       #ed1c1c;
   --color-brand-red-light: #fef2f2;
+}
+
+/* Colores sitio público (Material Design 3) */
+@theme {
+  --color-site-primary:                #005cad;
+  --color-site-on-primary:             #ffffff;
+  --color-site-primary-container:      #0075d8;
+  --color-site-on-primary-container:   #fefcff;
+  --color-site-primary-fixed:          #d5e3ff;
+  --color-site-on-primary-fixed:       #001c3b;
+  --color-site-secondary:              #bc000b;
+  --color-site-secondary-container:    #e71518;
+  --color-site-on-secondary-container: #fffbff;
+  --color-site-tertiary:               #005cae;
+  --color-site-tertiary-container:     #2175d1;
+  --color-site-surface:                #f9f9ff;
+  --color-site-surface-variant:        #d8e3fb;
+  --color-site-surface-container:      #e7eeff;
+  --color-site-surface-container-low:  #f0f3ff;
+  --color-site-surface-container-high: #dee8ff;
+  --color-site-surface-container-lowest: #ffffff;
+  --color-site-on-surface:             #111c2d;
+  --color-site-on-surface-variant:     #414753;
+  --color-site-outline:                #717784;
+  --color-site-outline-variant:        #c0c6d5;
+  --color-site-inverse-surface:        #263143;
 }
 
 body {

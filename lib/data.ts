@@ -553,3 +553,82 @@ export async function getDashboardStats() {
     resumenRama,
   }
 }
+
+// ============================================================
+// BLOG
+// ============================================================
+
+export async function getBlogPosts(soloPublicados = true) {
+  const supabase = await createServerClient()
+  let query = supabase
+    .from('blog_posts')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (soloPublicados) query = query.eq('publicado', true)
+  const { data, error } = await query
+  if (error) dbError(error)
+  return data || []
+}
+
+export async function getBlogPost(slug: string) {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('*')
+    .eq('slug', slug)
+    .single()
+  if (error) dbError(error)
+  return data
+}
+
+export async function getBlogPostById(id: string) {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) dbError(error)
+  return data
+}
+
+// ============================================================
+// MENSAJES DE CONTACTO
+// ============================================================
+
+export async function getMensajesContacto() {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('mensajes_contacto')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) dbError(error)
+  return data || []
+}
+
+// ============================================================
+// BLOG — versiones públicas (sin sesión, usan anon key)
+// ============================================================
+
+export async function getBlogPostsPublic() {
+  const { createPublicClient } = await import('./supabase/public')
+  const supabase = createPublicClient()
+  const { data } = await supabase
+    .from('blog_posts')
+    .select('*')
+    .eq('publicado', true)
+    .order('created_at', { ascending: false })
+  return data || []
+}
+
+export async function getBlogPostPublic(slug: string) {
+  const { createPublicClient } = await import('./supabase/public')
+  const supabase = createPublicClient()
+  const { data } = await supabase
+    .from('blog_posts')
+    .select('*')
+    .eq('slug', slug)
+    .eq('publicado', true)
+    .single()
+  return data
+}

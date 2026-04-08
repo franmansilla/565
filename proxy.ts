@@ -25,17 +25,25 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isLoginPage = request.nextUrl.pathname === '/login'
+  const { pathname } = request.nextUrl
 
-  if (!user && !isLoginPage) {
+  // Rutas públicas — accesibles sin autenticación
+  const isPublic =
+    pathname === '/' ||
+    pathname === '/blog' ||
+    pathname.startsWith('/blog/') ||
+    pathname === '/login'
+
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  if (user && isLoginPage) {
+  // Si ya está autenticado y va al login, llevarlo al dashboard
+  if (user && pathname === '/login') {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/admin'
     return NextResponse.redirect(url)
   }
 

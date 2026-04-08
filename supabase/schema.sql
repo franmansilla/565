@@ -336,3 +336,53 @@ ALTER TABLE documentos_protagonista ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all on documentos_protagonista" ON documentos_protagonista;
 CREATE POLICY "Allow all on documentos_protagonista" ON documentos_protagonista
   FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- MIGRATION 2A — Blog público
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  titulo TEXT NOT NULL,
+  slug TEXT NOT NULL UNIQUE,
+  resumen TEXT,
+  contenido TEXT NOT NULL,
+  imagen_url TEXT,
+  publicado BOOLEAN NOT NULL DEFAULT false,
+  publicado_en TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_blog_posts_slug ON blog_posts(slug);
+CREATE INDEX IF NOT EXISTS idx_blog_posts_publicado ON blog_posts(publicado);
+
+ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Blog read public" ON blog_posts;
+CREATE POLICY "Blog read public" ON blog_posts
+  FOR SELECT USING (publicado = true);
+DROP POLICY IF EXISTS "Blog write authenticated" ON blog_posts;
+CREATE POLICY "Blog write authenticated" ON blog_posts
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- ============================================================
+-- MIGRATION 2B — Mensajes de contacto
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS mensajes_contacto (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  email TEXT NOT NULL,
+  telefono TEXT,
+  mensaje TEXT NOT NULL,
+  leido BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE mensajes_contacto ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Contact insert public" ON mensajes_contacto;
+CREATE POLICY "Contact insert public" ON mensajes_contacto
+  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Contact read authenticated" ON mensajes_contacto;
+CREATE POLICY "Contact read authenticated" ON mensajes_contacto
+  FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');

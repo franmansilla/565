@@ -14,7 +14,7 @@ export async function signIn(formData: FormData) {
     redirect('/login?error=Credenciales incorrectas')
   }
 
-  redirect('/')
+  redirect('/admin')
 }
 
 export async function signOut() {

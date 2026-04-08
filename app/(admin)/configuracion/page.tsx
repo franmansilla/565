@@ -10,7 +10,7 @@ export default async function ConfiguracionPage() {
   if (!user) redirect('/login')
 
   const rol = await getCurrentUserRole(user.id)
-  if (rol !== 'admin') redirect('/')
+  if (rol !== 'admin') redirect('/admin')
 
   const [cuotaActual, historial] = await Promise.all([
     getCuotaActual(),

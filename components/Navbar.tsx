@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { GiFleurDeLys } from 'react-icons/gi'
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/data'
-import { signOut } from '@/app/login/actions'
+import { signOut } from '@/app/(admin)/login/actions'
 import { MobileMenu } from './MobileMenu'
 
 export async function Navbar() {
@@ -19,7 +19,7 @@ export async function Navbar() {
       <div className="px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MobileMenu isAdmin={isAdmin} />
-          <Link href="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+          <Link href="/admin" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
             <GiFleurDeLys size={22} />
             <span className="font-bold text-base tracking-tight">Niño Jesús de Praga</span>
             <span className="text-white/50 text-xs font-normal hidden sm:inline">— Grupo 565</span>

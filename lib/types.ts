@@ -194,6 +194,37 @@ export interface AuditoriaPago {
 }
 
 // ============================================================
+// INTERFACES — BLOG
+// ============================================================
+
+export interface BlogPost {
+  id: string
+  titulo: string
+  slug: string
+  resumen?: string
+  contenido: string
+  imagen_url?: string
+  publicado: boolean
+  publicado_en?: string
+  created_at: string
+  updated_at: string
+}
+
+// ============================================================
+// INTERFACES — CONTACTO
+// ============================================================
+
+export interface MensajeContacto {
+  id: string
+  nombre: string
+  email: string
+  telefono?: string
+  mensaje: string
+  leido: boolean
+  created_at: string
+}
+
+// ============================================================
 // INTERFACES — USUARIOS
 // ============================================================
 

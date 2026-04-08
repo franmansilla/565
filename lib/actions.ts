@@ -454,3 +454,87 @@ export async function enviarEmailCuotaVencida(cuotaId: string, protagonistaId: s
   const enviado = await enviarVencimientoCuota(protagonista, cp)
   if (!enviado) throw new Error('No se pudo enviar el email (sin dirección de correo)')
 }
+
+// ============================================================
+// BLOG
+// ============================================================
+
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+}
+
+export async function createBlogPost(formData: FormData) {
+  const supabase = await createServerClient()
+  const titulo = formData.get('titulo') as string
+  const publicado = formData.get('publicado') === 'true'
+  const { error } = await supabase.from('blog_posts').insert({
+    titulo,
+    slug: slugify(titulo) + '-' + Date.now(),
+    resumen: (formData.get('resumen') as string) || null,
+    contenido: formData.get('contenido') as string,
+    imagen_url: (formData.get('imagen_url') as string) || null,
+    publicado,
+    publicado_en: publicado ? new Date().toISOString() : null,
+  })
+  if (error) dbError(error)
+  revalidatePath('/blog')
+  revalidatePath('/admin/blog')
+  redirect('/admin/blog')
+}
+
+export async function updateBlogPost(id: string, formData: FormData) {
+  const supabase = await createServerClient()
+  const publicado = formData.get('publicado') === 'true'
+  const { error } = await supabase
+    .from('blog_posts')
+    .update({
+      titulo: formData.get('titulo') as string,
+      resumen: (formData.get('resumen') as string) || null,
+      contenido: formData.get('contenido') as string,
+      imagen_url: (formData.get('imagen_url') as string) || null,
+      publicado,
+      publicado_en: publicado ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) dbError(error)
+  revalidatePath('/blog')
+  revalidatePath('/admin/blog')
+  redirect('/admin/blog')
+}
+
+export async function deleteBlogPost(id: string) {
+  const supabase = await createServerClient()
+  const { error } = await supabase.from('blog_posts').delete().eq('id', id)
+  if (error) dbError(error)
+  revalidatePath('/blog')
+  revalidatePath('/admin/blog')
+  redirect('/admin/blog')
+}
+
+// ============================================================
+// MENSAJES DE CONTACTO
+// ============================================================
+
+export async function enviarMensajeContacto(formData: FormData) {
+  const supabase = await createServerClient()
+  const { error } = await supabase.from('mensajes_contacto').insert({
+    nombre: formData.get('nombre') as string,
+    email: formData.get('email') as string,
+    telefono: (formData.get('telefono') as string) || null,
+    mensaje: formData.get('mensaje') as string,
+  })
+  if (error) dbError(error)
+  redirect('/?contacto=ok')
+}
+
+export async function marcarMensajeLeido(id: string) {
+  const supabase = await createServerClient()
+  await supabase.from('mensajes_contacto').update({ leido: true }).eq('id', id)
+  revalidatePath('/admin/blog')
+}

@@ -3,14 +3,15 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MdMenu, MdClose, MdDashboard, MdPeople, MdPersonAdd, MdPayment, MdSchool, MdSettings } from 'react-icons/md'
+import { MdMenu, MdClose, MdDashboard, MdPeople, MdPersonAdd, MdPayment, MdSchool, MdSettings, MdArticle } from 'react-icons/md'
 import { GiFleurDeLys, GiCampingTent } from 'react-icons/gi'
 
 const NAV_ITEMS = [
-  { href: '/',              label: 'Dashboard',       icon: MdDashboard,   exact: true },
+  { href: '/admin',         label: 'Dashboard',       icon: MdDashboard,   exact: true },
   { href: '/protagonistas', label: 'Protagonistas',   icon: MdPeople },
   { href: '/campamentos',   label: 'Campamentos',     icon: GiCampingTent },
   { href: '/educadores',    label: 'Educadores',      icon: MdSchool },
+  { href: '/admin/blog',    label: 'Blog / Contacto', icon: MdArticle },
 ]
 
 const QUICK_ACTIONS = [
