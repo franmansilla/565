@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { MdArrowBack } from 'react-icons/md'
 import { createBeneficiario } from '@/lib/actions'
 import { RAMAS } from '@/lib/types'
+import { getGruposFamiliares } from '@/lib/data'
 
-export default function NuevoProtagonistPage() {
+export default async function NuevoProtagonistPage() {
   const today = new Date().toISOString().split('T')[0]
+  const grupos = await getGruposFamiliares()
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -42,20 +44,41 @@ export default function NuevoProtagonistPage() {
                 {RAMAS.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             </Field>
+            <Field label="Grupo Familiar (hermanos)">
+              <select name="grupo_familiar_id" className={`${inputCls} bg-white`}>
+                <option value="">Sin grupo / Hijo único</option>
+                {grupos.map((g) => {
+                  const miembros = (g.beneficiarios as unknown[]).length
+                  return (
+                    <option key={g.id} value={g.id}>
+                      {g.apellido_familia}{g.nombre !== g.apellido_familia ? ` — ${g.nombre}` : ''}
+                      {miembros > 0 ? ` (${miembros} miembro${miembros !== 1 ? 's' : ''})` : ' (sin miembros)'}
+                    </option>
+                  )
+                })}
+              </select>
+              <p className="text-xs text-slate-400 mt-1">
+                Asignar si tiene hermanos en el grupo → descuento automático.{' '}
+                <Link href="/admin/grupos-familiares/nuevo" className="text-primary hover:underline">Crear nuevo grupo</Link>
+              </p>
+            </Field>
           </div>
 
           <Field label="Tipo de cuota" required>
-            <div className="flex gap-4 mt-1">
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                <input type="radio" name="tipo_cuota" value="mensual" defaultChecked className="accent-primary" />
-                Mensual
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                <input type="radio" name="tipo_cuota" value="trimestral" className="accent-primary" />
-                Trimestral
-              </label>
+            <div className="flex gap-4 mt-1 flex-wrap">
+              {([
+                { value: 'mensual',     label: 'Mensual' },
+                { value: 'semestral_1', label: 'Semestral 1 (Abr–Jul)' },
+                { value: 'semestral_2', label: 'Semestral 2 (Ago–Nov)' },
+              ] as { value: string; label: string }[]).map((tc) => (
+                <label key={tc.value} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+                  <input type="radio" name="tipo_cuota" value={tc.value} defaultChecked={tc.value === 'mensual'} className="accent-primary" />
+                  {tc.label}
+                </label>
+              ))}
             </div>
           </Field>
+
 
           <div className="pt-2 border-t border-slate-100">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Datos de contacto</p>

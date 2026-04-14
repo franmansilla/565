@@ -3,11 +3,11 @@
 // ============================================================
 
 export type Rama = 'Lobatos y Lobeznas' | 'Scouts' | 'Caminantes' | 'Rovers'
-export type TipoCuota = 'mensual' | 'trimestral'
+export type TipoCuota = 'mensual' | 'trimestral' | 'semestral_1' | 'semestral_2'
 export type RamaCampamento = 'Lobatos y Lobeznas' | 'Scouts' | 'Caminantes' | 'Rovers' | 'Grupal'
 export type MetodoPago = 'Efectivo' | 'Transferencia' | 'Cheque'
-export type TipoPago = 'mensual' | 'trimestral' | 'campamento'
-export type TipoComprobante = 'cuota_mensual' | 'cuota_trimestral' | 'campamento'
+export type TipoPago = 'mensual' | 'trimestral' | 'semestral_1' | 'semestral_2' | 'campamento'
+export type TipoComprobante = 'cuota_mensual' | 'cuota_trimestral' | 'cuota_semestral_1' | 'cuota_semestral_2' | 'campamento'
 export type RolUsuario = 'admin' | 'educador' | 'readonly'
 export type EstadoPago = 'al_dia' | 'adeuda' | 'adelantado'
 
@@ -19,9 +19,10 @@ export const RAMAS: Rama[] = ['Lobatos y Lobeznas', 'Scouts', 'Caminantes', 'Rov
 export const RAMAS_CAMPAMENTO: RamaCampamento[] = ['Lobatos y Lobeznas', 'Scouts', 'Caminantes', 'Rovers', 'Grupal']
 export const METODOS_PAGO: MetodoPago[] = ['Efectivo', 'Transferencia', 'Cheque']
 export const TIPOS_PAGO: { value: TipoPago; label: string }[] = [
-  { value: 'mensual', label: 'Mensual' },
-  { value: 'trimestral', label: 'Trimestral' },
-  { value: 'campamento', label: 'Campamento' },
+  { value: 'mensual',     label: 'Mensual' },
+  { value: 'semestral_1', label: 'Semestral 1 (Abr–Jul)' },
+  { value: 'semestral_2', label: 'Semestral 2 (Ago–Nov)' },
+  { value: 'campamento',  label: 'Campamento' },
 ]
 export const ROLES_USUARIO: RolUsuario[] = ['admin', 'educador', 'readonly']
 export const MESES = [
@@ -64,6 +65,8 @@ export interface Protagonista {
   fecha_ingreso: string
   activo: boolean
   tipo_cuota: TipoCuota
+  grupo_familiar_id?: string | null
+  orden_hermano: number
   created_at: string
 }
 
@@ -191,6 +194,21 @@ export interface AuditoriaPago {
   datos_nuevos?: Record<string, unknown>
   ip?: string
   fecha: string
+}
+
+// ============================================================
+// INTERFACES — GRUPOS FAMILIARES
+// ============================================================
+
+export interface GrupoFamiliar {
+  id: string
+  nombre: string
+  apellido_familia: string
+  telefono_contacto?: string
+  email_contacto?: string
+  direccion?: string
+  barrio?: string
+  created_at: string
 }
 
 // ============================================================

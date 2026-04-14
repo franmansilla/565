@@ -386,3 +386,83 @@ CREATE POLICY "Contact insert public" ON mensajes_contacto
 DROP POLICY IF EXISTS "Contact read authenticated" ON mensajes_contacto;
 CREATE POLICY "Contact read authenticated" ON mensajes_contacto
   FOR ALL USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
+
+-- ============================================================
+-- MIGRATION 3A — Grupos Familiares
+-- Agrupa hermanos para aplicar descuentos por orden de ingreso
+-- ============================================================
+CREATE TABLE IF NOT EXISTS grupos_familiares (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  apellido TEXT NOT NULL,
+  notas TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_grupos_familiares_apellido ON grupos_familiares(apellido);
+ALTER TABLE grupos_familiares ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all on grupos_familiares" ON grupos_familiares;
+CREATE POLICY "Allow all on grupos_familiares" ON grupos_familiares FOR ALL USING (true) WITH CHECK (true);
+
+ALTER TABLE beneficiarios ADD COLUMN IF NOT EXISTS grupo_familiar_id UUID REFERENCES grupos_familiares(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_beneficiarios_grupo_familiar ON beneficiarios(grupo_familiar_id);
+
+-- ============================================================
+-- MIGRATION 3B — Cuota config con tiers de hermanos
+-- monto = titular (miembro 1)
+-- monto_hermano1 = segundo hermano
+-- monto_hermano2 = tercer hermano en adelante
+-- ============================================================
+ALTER TABLE cuota_config ADD COLUMN IF NOT EXISTS monto_hermano1 DECIMAL(10,2);
+ALTER TABLE cuota_config ADD COLUMN IF NOT EXISTS monto_hermano2 DECIMAL(10,2);
+
+-- ============================================================
+-- MIGRATION 3C — Cuota semestral por período
+-- Semestre 1: Abr–Jul, vence 10 May
+-- Semestre 2: Ago–Nov, vence 10 Sep
+-- ============================================================
+CREATE TABLE IF NOT EXISTS cuota_semestral (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  periodo TEXT NOT NULL CHECK (periodo IN ('sem1', 'sem2')),
+  anio INTEGER NOT NULL,
+  meses TEXT[] NOT NULL,
+  fecha_vencimiento DATE NOT NULL,
+  monto_titular DECIMAL(10,2),
+  monto_hermano1 DECIMAL(10,2),
+  monto_hermano2 DECIMAL(10,2),
+  descripcion TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (periodo, anio)
+);
+
+ALTER TABLE cuota_semestral ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all on cuota_semestral" ON cuota_semestral;
+CREATE POLICY "Allow all on cuota_semestral" ON cuota_semestral FOR ALL USING (true) WITH CHECK (true);
+
+-- Semestres 2026 con los montos iniciales indicados
+INSERT INTO cuota_semestral (periodo, anio, meses, fecha_vencimiento, monto_titular, monto_hermano1, monto_hermano2, descripcion)
+VALUES
+  ('sem1', 2026, ARRAY['2026-04','2026-05','2026-06','2026-07'], '2026-05-10',
+   60000, 42000, 39000, 'Semestre 1 2026 — Abr a Jul, vence 10 de Mayo'),
+  ('sem2', 2026, ARRAY['2026-08','2026-09','2026-10','2026-11'], '2026-09-10',
+   NULL, NULL, NULL, 'Semestre 2 2026 — Ago a Nov, vence 10 de Sep (monto a confirmar)')
+ON CONFLICT (periodo, anio) DO NOTHING;
+
+-- Actualizar tipo_cuota en beneficiarios para incluir 'semestral'
+ALTER TABLE beneficiarios DROP CONSTRAINT IF EXISTS beneficiarios_tipo_cuota_check;
+ALTER TABLE beneficiarios ADD CONSTRAINT beneficiarios_tipo_cuota_check
+  CHECK (tipo_cuota IN ('mensual', 'trimestral', 'semestral'));
+
+-- Actualizar tipo en pagos para incluir 'semestral'
+ALTER TABLE pagos DROP CONSTRAINT IF EXISTS pagos_tipo_check;
+ALTER TABLE pagos ADD CONSTRAINT pagos_tipo_check
+  CHECK (tipo IN ('mensual', 'trimestral', 'semestral', 'campamento'));
+
+-- Actualizar tipo en cuotas_pendientes para incluir 'semestral'
+ALTER TABLE cuotas_pendientes DROP CONSTRAINT IF EXISTS cuotas_pendientes_tipo_check;
+ALTER TABLE cuotas_pendientes ADD CONSTRAINT cuotas_pendientes_tipo_check
+  CHECK (tipo IN ('mensual', 'trimestral', 'semestral'));
+
+-- Actualizar tipo en comprobantes para incluir 'cuota_semestral'
+ALTER TABLE comprobantes DROP CONSTRAINT IF EXISTS comprobantes_tipo_check;
+ALTER TABLE comprobantes ADD CONSTRAINT comprobantes_tipo_check
+  CHECK (tipo IN ('cuota_mensual', 'cuota_trimestral', 'cuota_semestral', 'campamento'));

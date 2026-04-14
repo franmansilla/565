@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { MdArrowBack, MdLightbulb } from 'react-icons/md'
-import { getBeneficiario } from '@/lib/data'
+import { getBeneficiario, getGruposFamiliares } from '@/lib/data'
 import { updateBeneficiario } from '@/lib/actions'
 import { RAMAS, type TipoCuota } from '@/lib/types'
 
@@ -10,7 +10,7 @@ export default async function EditarProtagonistPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const p = await getBeneficiario(id)
+  const [p, grupos] = await Promise.all([getBeneficiario(id), getGruposFamiliares()])
   const updateWithId = updateBeneficiario.bind(null, id)
 
   return (
@@ -55,20 +55,44 @@ export default async function EditarProtagonistPage({
           </div>
 
           <Field label="Tipo de cuota" required>
-            <div className="flex gap-4 mt-1">
-              {(['mensual', 'trimestral'] as TipoCuota[]).map((tc) => (
-                <label key={tc} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
+            <div className="flex gap-4 mt-1 flex-wrap">
+              {([
+                { value: 'mensual',     label: 'Mensual' },
+                { value: 'semestral_1', label: 'Semestral 1 (Abr–Jul)' },
+                { value: 'semestral_2', label: 'Semestral 2 (Ago–Nov)' },
+              ] as { value: TipoCuota; label: string }[]).map((tc) => (
+                <label key={tc.value} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
                   <input
                     type="radio"
                     name="tipo_cuota"
-                    value={tc}
-                    defaultChecked={(p.tipo_cuota || 'mensual') === tc}
+                    value={tc.value}
+                    defaultChecked={(p.tipo_cuota || 'mensual') === tc.value}
                     className="accent-primary"
                   />
-                  {tc.charAt(0).toUpperCase() + tc.slice(1)}
+                  {tc.label}
                 </label>
               ))}
             </div>
+          </Field>
+
+
+          <Field label="Grupo Familiar (hermanos)">
+            <select name="grupo_familiar_id" defaultValue={p.grupo_familiar_id || ''} className={`${inputCls} bg-white`}>
+              <option value="">Sin grupo / Hijo único</option>
+              {grupos.map((g) => {
+                const miembros = (g.beneficiarios as unknown[]).length
+                return (
+                  <option key={g.id} value={g.id}>
+                    {g.apellido_familia}{g.nombre !== g.apellido_familia ? ` — ${g.nombre}` : ''}
+                    {miembros > 0 ? ` (${miembros} miembro${miembros !== 1 ? 's' : ''})` : ' (sin miembros)'}
+                  </option>
+                )
+              })}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Asignar si tiene hermanos en el grupo → descuento automático.{' '}
+              <Link href="/admin/grupos-familiares/nuevo" className="text-primary hover:underline">Crear nuevo grupo</Link>
+            </p>
           </Field>
 
           <div className="pt-2 border-t border-slate-100">

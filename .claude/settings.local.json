@@ -21,7 +21,10 @@
       "Bash(find /Users/franciscomansilla/Desktop/565 -name *.png -not -path */node_modules/* -not -path */.next/*)",
       "Bash(cat /Users/franciscomansilla/Desktop/565/tailwind.config.*)",
       "Bash(curl -L \"https://lh3.googleusercontent.com/aida-public/AB6AXuDL-DxwYJmvgYV_BmlCg5g7pRDt5zceA-qK1YxDiTl4w-OcvNF0VVJnWeZxlUkYBx_LW6jCFj1-x-AJ7Y6W0XUbdo-BQXxyrcFSwE68Gs_fY3Tnq5PMWGX2yYYa1gaSjEuDGu7ZgJlEfZSF6sB4t3fOeOjVncwsHDUv_dC1cVJgq5ZeiMESsbRZXHlZqwhwnGEML17wg9RbE5kqlWXIpcW6YrkgZ-_HRNAcTasS3ItjWRyqb7fGVzJXTQjacmOoVAz-3ABLYh65DLnx\" -o /Users/franciscomansilla/Desktop/565/public/hero.png)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(ls /Users/franciscomansilla/Desktop/565/app/\\\\\\(admin\\\\\\)/admin/grupos-familiares/nuevo/)",
+      "Bash(ls /Users/franciscomansilla/Desktop/565/app/\\\\\\(admin\\\\\\)/admin/grupos-familiares/[id]/)"
     ]
   }
 }

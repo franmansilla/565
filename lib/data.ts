@@ -450,6 +450,31 @@ export async function getCurrentUserRole(userId: string) {
 }
 
 // ============================================================
+// GRUPOS FAMILIARES
+// ============================================================
+
+export async function getGruposFamiliares() {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('grupos_familiares')
+    .select('*, beneficiarios(id, nombre, apellido, rama, orden_hermano, activo)')
+    .order('apellido_familia', { ascending: true })
+  if (error) dbError(error)
+  return data || []
+}
+
+export async function getGrupoFamiliar(id: string) {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('grupos_familiares')
+    .select('*, beneficiarios(id, nombre, apellido, rama, orden_hermano, activo)')
+    .eq('id', id)
+    .single()
+  if (error) dbError(error)
+  return data!
+}
+
+// ============================================================
 // NOTAS DE CRÉDITO
 // ============================================================
 

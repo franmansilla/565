@@ -143,21 +143,6 @@ export default async function ComprobantePage({
           </div>
         </div>
 
-        {/* Firmas */}
-        <div className="grid grid-cols-2 gap-12 pt-8 border-t border-slate-200">
-          <div className="text-center">
-            <div className="h-14"></div>
-            <div className="border-t border-slate-400 pt-2">
-              <p className="text-xs text-slate-500">Firma del Tesorero</p>
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="h-14"></div>
-            <div className="border-t border-slate-400 pt-2">
-              <p className="text-xs text-slate-500">Sello del Grupo</p>
-            </div>
-          </div>
-        </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
           Comprobante válido como recibo de pago de membresía — Grupo Scout Niño Jesús de Praga (Grupo 565)

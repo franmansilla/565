@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MdDashboard, MdPeople, MdPersonAdd, MdPayment, MdSchool, MdSettings, MdArticle } from 'react-icons/md'
+import { MdDashboard, MdPeople, MdPersonAdd, MdPayment, MdSchool, MdSettings, MdArticle, MdFamilyRestroom } from 'react-icons/md'
 import { GiCampingTent } from 'react-icons/gi'
 
 const QUICK_ACTIONS = [
@@ -16,7 +16,8 @@ const NAV_ITEMS = [
   { href: '/protagonistas', label: 'Protagonistas',   icon: MdPeople },
   { href: '/campamentos',   label: 'Campamentos',     icon: GiCampingTent },
   { href: '/educadores',    label: 'Educadores',      icon: MdSchool },
-  { href: '/admin/blog',    label: 'Blog / Contacto', icon: MdArticle },
+  { href: '/admin/blog',              label: 'Blog / Contacto',   icon: MdArticle },
+  { href: '/admin/grupos-familiares', label: 'Grupos Familiares',  icon: MdFamilyRestroom },
 ]
 
 export function Sidebar({ isAdmin }: { isAdmin?: boolean }) {

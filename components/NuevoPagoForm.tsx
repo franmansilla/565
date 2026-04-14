@@ -4,20 +4,38 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { MdEdit } from 'react-icons/md'
 import { createPago } from '@/lib/actions'
-import { MESES, MESES_SCOUT, METODOS_PAGO, TIPOS_PAGO } from '@/lib/types'
+import { MESES, MESES_SCOUT, METODOS_PAGO } from '@/lib/types'
 
-const TRIMESTRES = [
-  { label: 'Abril - Mayo - Junio',        meses: [4, 5, 6],  periodoMes: 4  },
-  { label: 'Julio - Agosto - Septiembre', meses: [7, 8, 9],  periodoMes: 7  },
-  { label: 'Octubre - Noviembre',         meses: [10, 11],   periodoMes: 10 },
-]
+// Semestres fijos
+const SEMESTRES = {
+  semestral_1: { meses: [4, 5, 6, 7], periodoMes: 4, label: 'Semestral 1 — Abr a Jul' },
+  semestral_2: { meses: [8, 9, 10, 11], periodoMes: 8, label: 'Semestral 2 — Ago a Nov' },
+}
 
-type Protagonista = { id: string; apellido: string; nombre: string; rama: string }
+type Protagonista = {
+  id: string
+  apellido: string
+  nombre: string
+  rama: string
+  orden_hermano: number
+}
 type Campamento = {
   id: string
   nombre: string
   precio_estimado?: number | null
   fecha_inicio: string
+}
+
+interface CuotaConfig {
+  monto: number
+  monto_hermano1?: number | null
+  monto_hermano2?: number | null
+  monto_semestral1?: number | null
+  monto_semestral1_hermano1?: number | null
+  monto_semestral1_hermano2?: number | null
+  monto_semestral2?: number | null
+  monto_semestral2_hermano1?: number | null
+  monto_semestral2_hermano2?: number | null
 }
 
 interface Props {
@@ -27,10 +45,38 @@ interface Props {
   today: string
   currentMonth: number
   currentYear: number
-  montoCuotaMensual: number
-  montoCuotaTrimestralMes: number
+  cuota: CuotaConfig | null
   beneficiarioId?: string
 }
+
+function montoParaTipo(tipo: string, ordenHermano: number, cuota: CuotaConfig | null): number {
+  if (!cuota) return 0
+  const tier = ordenHermano <= 1 ? 'titular' : ordenHermano === 2 ? 'h1' : 'h2'
+
+  if (tipo === 'mensual') {
+    if (tier === 'titular') return Number(cuota.monto) || 0
+    if (tier === 'h1') return Number(cuota.monto_hermano1) || 0
+    return Number(cuota.monto_hermano2) || 0
+  }
+  if (tipo === 'semestral_1') {
+    if (tier === 'titular') return Number(cuota.monto_semestral1) || 0
+    if (tier === 'h1') return Number(cuota.monto_semestral1_hermano1) || 0
+    return Number(cuota.monto_semestral1_hermano2) || 0
+  }
+  if (tipo === 'semestral_2') {
+    if (tier === 'titular') return Number(cuota.monto_semestral2) || 0
+    if (tier === 'h1') return Number(cuota.monto_semestral2_hermano1) || 0
+    return Number(cuota.monto_semestral2_hermano2) || 0
+  }
+  return 0
+}
+
+const TIPOS_FORM = [
+  { value: 'mensual',     label: 'Mensual' },
+  { value: 'semestral_1', label: 'Semestral 1 (Abr–Jul)' },
+  { value: 'semestral_2', label: 'Semestral 2 (Ago–Nov)' },
+  { value: 'campamento',  label: 'Campamento' },
+]
 
 export function NuevoPagoForm({
   protagonistas,
@@ -39,28 +85,24 @@ export function NuevoPagoForm({
   today,
   currentMonth,
   currentYear,
-  montoCuotaMensual,
-  montoCuotaTrimestralMes,
+  cuota,
   beneficiarioId,
 }: Props) {
   const [tipo, setTipo] = useState('mensual')
-  const [trimestreIdx, setTrimestreIdx] = useState(0)
-  const [anioTrimestre, setAnioTrimestre] = useState(currentYear)
+  const [selectedId, setSelectedId] = useState(preseleccionadoId || '')
   const [campamentoId, setCampamentoId] = useState(campamentos[0]?.id || '')
   const [editarMonto, setEditarMonto] = useState(false)
   const [montoManual, setMontoManual] = useState('')
   const [concepto, setConcepto] = useState('Cuota mensual')
 
-  const trimestre = TRIMESTRES[trimestreIdx]
-  const esCuota = tipo === 'mensual' || tipo === 'trimestral'
   const esCampamento = tipo === 'campamento'
+  const esSemestral = tipo === 'semestral_1' || tipo === 'semestral_2'
 
   const campamentoSeleccionado = useMemo(
     () => campamentos.find((c) => c.id === campamentoId) ?? null,
     [campamentos, campamentoId]
   )
 
-  // Período derivado del campamento (mes y año de fecha_inicio)
   const campamentoPeriodoMes = useMemo(() => {
     if (!campamentoSeleccionado) return currentMonth
     return parseInt(campamentoSeleccionado.fecha_inicio.split('-')[1], 10)
@@ -71,49 +113,53 @@ export function NuevoPagoForm({
     return parseInt(campamentoSeleccionado.fecha_inicio.split('-')[0], 10)
   }, [campamentoSeleccionado, currentYear])
 
+  // Protagonista seleccionado y su tier
+  const protagonistaSeleccionado = protagonistas.find(p => p.id === selectedId) ?? null
+  const ordenHermano = protagonistaSeleccionado?.orden_hermano ?? 1
+  const tierLabel = ordenHermano <= 1 ? 'Titular' : ordenHermano === 2 ? 'Hermano 1' : 'Hermano 2+'
+  const tierEmoji = ordenHermano <= 1 ? '🥇' : ordenHermano === 2 ? '🥈' : '🥉'
+
   const montoCalculado = useMemo(() => {
-    if (tipo === 'mensual') return montoCuotaMensual
-    if (tipo === 'trimestral') return montoCuotaTrimestralMes * trimestre.meses.length
-    if (tipo === 'campamento') return campamentoSeleccionado?.precio_estimado ?? 0
-    return 0
-  }, [tipo, trimestre, montoCuotaMensual, montoCuotaTrimestralMes, campamentoSeleccionado])
+    if (esCampamento) return campamentoSeleccionado?.precio_estimado ?? 0
+    return montoParaTipo(tipo, ordenHermano, cuota)
+  }, [tipo, ordenHermano, cuota, esCampamento, campamentoSeleccionado])
 
-  const tieneAutoMonto = esCuota || (esCampamento && (campamentoSeleccionado?.precio_estimado ?? 0) > 0)
+  const tieneAutoMonto = montoCalculado > 0
 
+  // Meses cubiertos para semestral
   const mesesCubiertosStr = useMemo(() => {
-    if (tipo !== 'trimestral') return ''
-    return trimestre.meses
-      .map((m) => `${anioTrimestre}-${String(m).padStart(2, '0')}`)
-      .join(',')
-  }, [tipo, trimestre, anioTrimestre])
-
-  function conceptoDefault(t: string, campId?: string) {
-    if (t === 'mensual') return 'Cuota mensual'
-    if (t === 'trimestral') return 'Cuota trimestral'
-    if (t === 'campamento') {
-      const camp = campamentos.find((c) => c.id === (campId ?? campamentoId))
-      return camp ? `Campamento ${camp.nombre}` : 'Campamento'
+    if (esSemestral) {
+      const sem = SEMESTRES[tipo as keyof typeof SEMESTRES]
+      return sem.meses.map(m => `${currentYear}-${String(m).padStart(2, '0')}`).join(',')
     }
     return ''
-  }
+  }, [tipo, esSemestral, currentYear])
+
+  // Período para semestral
+  const semPeriodoMes = esSemestral ? SEMESTRES[tipo as keyof typeof SEMESTRES].periodoMes : currentMonth
+  const semPeriodoAnio = currentYear
 
   function handleTipoChange(v: string) {
     setTipo(v)
     setEditarMonto(false)
     setMontoManual('')
-    setConcepto(conceptoDefault(v))
+    const labels: Record<string, string> = {
+      mensual: 'Cuota mensual',
+      semestral_1: 'Cuota semestral 1 (Abr–Jul)',
+      semestral_2: 'Cuota semestral 2 (Ago–Nov)',
+    }
+    setConcepto(labels[v] ?? 'Campamento')
   }
 
   function handleCampamentoChange(id: string) {
     setCampamentoId(id)
     setEditarMonto(false)
     setMontoManual('')
-    setConcepto(conceptoDefault('campamento', id))
+    const camp = campamentos.find(c => c.id === id)
+    setConcepto(camp ? `Campamento ${camp.nombre}` : 'Campamento')
   }
 
-  const montoValue = tieneAutoMonto && !editarMonto
-    ? String(montoCalculado)
-    : editarMonto ? montoManual : ''
+  const montoValue = tieneAutoMonto && !editarMonto ? String(montoCalculado) : editarMonto ? montoManual : ''
 
   return (
     <form action={createPago} className="space-y-5">
@@ -125,19 +171,26 @@ export function NuevoPagoForm({
         <select
           name="beneficiario_id"
           required
-          defaultValue={preseleccionadoId || ''}
+          value={selectedId}
+          onChange={(e) => { setSelectedId(e.target.value); setEditarMonto(false); setMontoManual('') }}
           className={`${inputCls} bg-white`}
         >
           <option value="" disabled>Seleccionar protagonista...</option>
           {protagonistas.map((p) => (
             <option key={p.id} value={p.id}>
               {p.apellido}, {p.nombre} — {p.rama}
+              {p.orden_hermano > 1 ? ` (H${p.orden_hermano})` : ''}
             </option>
           ))}
         </select>
+        {selectedId && ordenHermano > 1 && (
+          <p className="text-xs text-primary mt-1 font-medium">
+            {tierEmoji} {tierLabel} — descuento de hermano aplicado automáticamente
+          </p>
+        )}
       </div>
 
-      {/* Tipo de Pago */}
+      {/* Tipo */}
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">
           Tipo de Pago <span className="text-brand-red">*</span>
@@ -149,117 +202,71 @@ export function NuevoPagoForm({
           onChange={(e) => handleTipoChange(e.target.value)}
           className={`${inputCls} bg-white`}
         >
-          {TIPOS_PAGO.filter((t) => t.value !== 'campamento' || campamentos.length > 0).map((t) => (
+          {TIPOS_FORM.filter(t => t.value !== 'campamento' || campamentos.length > 0).map(t => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </select>
       </div>
 
-      {/* Campamento — selector requerido */}
-      {esCampamento && (
-        <>
-          {campamentos.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Campamento <span className="text-brand-red">*</span>
-              </label>
-              <select
-                name="campamento_id"
-                required
-                value={campamentoId}
-                onChange={(e) => handleCampamentoChange(e.target.value)}
-                className={`${inputCls} bg-white`}
-              >
-                {campamentos.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                    {c.precio_estimado ? ` — $${Number(c.precio_estimado).toLocaleString('es-AR')}` : ''}
-                  </option>
-                ))}
-              </select>
-              {campamentoSeleccionado && (
-                <p className="text-xs text-slate-400 mt-1">
-                  Inicio: {new Date(campamentoSeleccionado.fecha_inicio + 'T00:00:00').toLocaleDateString('es-AR')}
-                  {' · '}Período: {MESES[campamentoPeriodoMes - 1]} {campamentoPeriodoAnio}
-                </p>
-              )}
-            </div>
+      {/* Campamento */}
+      {esCampamento && campamentos.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            Campamento <span className="text-brand-red">*</span>
+          </label>
+          <select name="campamento_id" required value={campamentoId}
+            onChange={(e) => handleCampamentoChange(e.target.value)}
+            className={`${inputCls} bg-white`}>
+            {campamentos.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}{c.precio_estimado ? ` — $${Number(c.precio_estimado).toLocaleString('es-AR')}` : ''}
+              </option>
+            ))}
+          </select>
+          {campamentoSeleccionado && (
+            <p className="text-xs text-slate-400 mt-1">
+              Inicio: {new Date(campamentoSeleccionado.fecha_inicio + 'T00:00:00').toLocaleDateString('es-AR')}
+              {' · '}Período: {MESES[campamentoPeriodoMes - 1]} {campamentoPeriodoAnio}
+            </p>
           )}
-          {/* Hidden period from campamento */}
-
           <input type="hidden" name="periodo_mes" value={campamentoPeriodoMes} />
           <input type="hidden" name="periodo_anio" value={campamentoPeriodoAnio} />
-        </>
+        </div>
       )}
 
-      {/* Período — mensual */}
+      {/* Período mensual */}
       {tipo === 'mensual' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Mes <span className="text-brand-red">*</span>
             </label>
-            <select name="periodo_mes" required defaultValue={MESES_SCOUT.includes(currentMonth) ? currentMonth : MESES_SCOUT[0]} className={`${inputCls} bg-white`}>
-              {MESES_SCOUT.map((m) => (
-                <option key={m} value={m}>{MESES[m - 1]}</option>
-              ))}
+            <select name="periodo_mes" required
+              defaultValue={MESES_SCOUT.includes(currentMonth) ? currentMonth : MESES_SCOUT[0]}
+              className={`${inputCls} bg-white`}>
+              {MESES_SCOUT.map(m => <option key={m} value={m}>{MESES[m - 1]}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Año <span className="text-brand-red">*</span>
-            </label>
-            <input
-              name="periodo_anio"
-              type="number"
-              required
-              defaultValue={currentYear}
-              min={2000}
-              max={2100}
-              className={inputCls}
-            />
+            <label className="block text-sm font-medium text-slate-700 mb-1">Año <span className="text-brand-red">*</span></label>
+            <input name="periodo_anio" type="number" required defaultValue={currentYear} min={2000} max={2100} className={inputCls} />
           </div>
         </div>
       )}
 
-      {/* Período — trimestral */}
-      {tipo === 'trimestral' && (
+      {/* Semestral — período fijo */}
+      {esSemestral && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Trimestre <span className="text-brand-red">*</span>
-              </label>
-              <select
-                value={trimestreIdx}
-                onChange={(e) => setTrimestreIdx(Number(e.target.value))}
-                className={`${inputCls} bg-white`}
-              >
-                {TRIMESTRES.map((t, i) => (
-                  <option key={i} value={i}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Año <span className="text-brand-red">*</span>
-              </label>
-              <input
-                value={anioTrimestre}
-                onChange={(e) => setAnioTrimestre(Number(e.target.value))}
-                type="number"
-                min={2000}
-                max={2100}
-                className={inputCls}
-              />
-            </div>
+          <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-600">
+            {tipo === 'semestral_1'
+              ? 'Cubre: Abril, Mayo, Junio, Julio — Vence 10 de Mayo'
+              : 'Cubre: Agosto, Septiembre, Octubre, Noviembre — Vence 10 de Septiembre'}
           </div>
-          <input type="hidden" name="periodo_mes" value={trimestre.periodoMes} />
-          <input type="hidden" name="periodo_anio" value={anioTrimestre} />
+          <input type="hidden" name="periodo_mes" value={semPeriodoMes} />
+          <input type="hidden" name="periodo_anio" value={semPeriodoAnio} />
           <input type="hidden" name="meses_cubiertos" value={mesesCubiertosStr} />
         </>
       )}
-
 
       {/* Monto */}
       <div>
@@ -269,37 +276,25 @@ export function NuevoPagoForm({
           </label>
           {tieneAutoMonto && (
             <label className="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={editarMonto}
-                onChange={(e) => {
-                  setEditarMonto(e.target.checked)
-                  if (e.target.checked) setMontoManual(String(montoCalculado))
-                }}
-                className="w-3.5 h-3.5 accent-primary"
-              />
-              <MdEdit size={13} />
-              Editar monto
+              <input type="checkbox" checked={editarMonto}
+                onChange={e => { setEditarMonto(e.target.checked); if (e.target.checked) setMontoManual(String(montoCalculado)) }}
+                className="w-3.5 h-3.5 accent-primary" />
+              <MdEdit size={13} /> Editar monto
             </label>
           )}
         </div>
         <input
-          name="monto"
-          type="number"
-          required
-          step="0.01"
-          min="0"
+          name="monto" type="number" required step="0.01" min="0"
           readOnly={tieneAutoMonto && !editarMonto}
           value={tieneAutoMonto ? montoValue : undefined}
-          onChange={tieneAutoMonto ? (e) => editarMonto && setMontoManual(e.target.value) : undefined}
+          onChange={tieneAutoMonto ? e => editarMonto && setMontoManual(e.target.value) : undefined}
           placeholder="0.00"
           className={`${inputCls} ${tieneAutoMonto && !editarMonto ? 'bg-slate-50 text-slate-600' : ''}`}
         />
         {tieneAutoMonto && !editarMonto && montoCalculado > 0 && (
           <p className="text-xs text-slate-400 mt-1">
-            {tipo === 'mensual' && `Cuota mensual: $${montoCuotaMensual}`}
-            {tipo === 'trimestral' && `$${montoCuotaTrimestralMes}/mes × ${trimestre.meses.length} meses = $${montoCalculado}`}
-            {tipo === 'campamento' && `Precio estimado del campamento`}
+            {tipo !== 'campamento' && `${tierEmoji} ${tierLabel}: `}
+            ${montoCalculado.toLocaleString('es-AR')}
           </p>
         )}
       </div>
@@ -311,7 +306,7 @@ export function NuevoPagoForm({
             Método de Pago <span className="text-brand-red">*</span>
           </label>
           <select name="metodo_pago" required className={`${inputCls} bg-white`}>
-            {METODOS_PAGO.map((m) => <option key={m} value={m}>{m}</option>)}
+            {METODOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
         <div>
@@ -322,13 +317,7 @@ export function NuevoPagoForm({
 
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">Concepto</label>
-        <input
-          name="concepto"
-          value={concepto}
-          onChange={(e) => setConcepto(e.target.value)}
-          placeholder="Sin concepto"
-          className={inputCls}
-        />
+        <input name="concepto" value={concepto} onChange={e => setConcepto(e.target.value)} className={inputCls} />
       </div>
 
       <div>
@@ -337,16 +326,12 @@ export function NuevoPagoForm({
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button
-          type="submit"
-          className="flex-1 bg-primary text-white py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium"
-        >
+        <button type="submit"
+          className="flex-1 bg-primary text-white py-2.5 rounded-lg hover:bg-primary-dark transition-colors font-medium">
           Registrar y Ver Comprobante
         </button>
-        <Link
-          href={beneficiarioId ? `/protagonistas/${beneficiarioId}` : '/protagonistas'}
-          className="flex-1 text-center border border-slate-200 text-slate-600 py-2.5 rounded-lg hover:bg-slate-50 transition-colors"
-        >
+        <Link href={beneficiarioId ? `/protagonistas/${beneficiarioId}` : '/protagonistas'}
+          className="flex-1 text-center border border-slate-200 text-slate-600 py-2.5 rounded-lg hover:bg-slate-50 transition-colors">
           Cancelar
         </Link>
       </div>

@@ -9,6 +9,7 @@ export default async function NuevoPagoPage({
   searchParams: Promise<{ beneficiario?: string }>
 }) {
   const { beneficiario: beneficiarioId } = await searchParams
+
   const [protagonistas, preseleccionado, campamentos, cuota] = await Promise.all([
     getBeneficiarios(),
     beneficiarioId ? getBeneficiario(beneficiarioId) : null,
@@ -20,9 +21,6 @@ export default async function NuevoPagoPage({
   const currentMonth = now.getMonth() + 1
   const currentYear = now.getFullYear()
   const today = now.toISOString().split('T')[0]
-
-  const montoCuotaMensual = cuota ? Number(cuota.monto) : 0
-  const montoCuotaTrimestralMes = cuota?.monto_trimestral_mes ? Number(cuota.monto_trimestral_mes) : 0
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -41,14 +39,13 @@ export default async function NuevoPagoPage({
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <NuevoPagoForm
-          protagonistas={protagonistas}
+          protagonistas={protagonistas as Parameters<typeof NuevoPagoForm>[0]['protagonistas']}
           campamentos={campamentos}
           preseleccionadoId={beneficiarioId}
           today={today}
           currentMonth={currentMonth}
           currentYear={currentYear}
-          montoCuotaMensual={montoCuotaMensual}
-          montoCuotaTrimestralMes={montoCuotaTrimestralMes}
+          cuota={cuota as Parameters<typeof NuevoPagoForm>[0]['cuota']}
           beneficiarioId={beneficiarioId}
         />
       </div>

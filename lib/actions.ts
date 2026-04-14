@@ -27,8 +27,27 @@ function revalidateProtagonistas(id?: string) {
 // PROTAGONISTAS
 // ============================================================
 
+/** Calcula el orden automático dentro de un grupo familiar */
+async function calcularOrdenHermano(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  grupoFamiliarId: string | null,
+  excludeId?: string
+): Promise<number> {
+  if (!grupoFamiliarId) return 1
+  let query = supabase
+    .from('beneficiarios')
+    .select('*', { count: 'exact', head: true })
+    .eq('grupo_familiar_id', grupoFamiliarId)
+  if (excludeId) query = query.neq('id', excludeId)
+  const { count } = await query
+  return (count ?? 0) + 1
+}
+
 export async function createBeneficiario(formData: FormData) {
   const supabase = await createServerClient()
+  const grupoFamiliarId = (formData.get('grupo_familiar_id') as string) || null
+  const ordenHermano = await calcularOrdenHermano(supabase, grupoFamiliarId)
+
   const { error } = await supabase.from('beneficiarios').insert({
     nombre: formData.get('nombre') as string,
     apellido: formData.get('apellido') as string,
@@ -44,6 +63,8 @@ export async function createBeneficiario(formData: FormData) {
     rama: formData.get('rama') as Rama,
     fecha_ingreso: formData.get('fecha_ingreso') as string,
     tipo_cuota: (formData.get('tipo_cuota') as TipoCuota) || 'mensual',
+    grupo_familiar_id: grupoFamiliarId,
+    orden_hermano: ordenHermano,
     activo: true,
   })
   if (error) dbError(error)
@@ -56,6 +77,23 @@ export async function updateBeneficiario(id: string, formData: FormData) {
 
   const ramaAnteriorRaw = formData.get('rama_anterior') as string | null
   const ramaNueva = formData.get('rama') as Rama
+  const nuevoGrupoId = (formData.get('grupo_familiar_id') as string) || null
+
+  // Solo recalcular el orden si el grupo cambió
+  const { data: actual } = await supabase
+    .from('beneficiarios')
+    .select('grupo_familiar_id, orden_hermano, tipo_cuota')
+    .eq('id', id)
+    .single()
+
+  const grupoAnterior = actual?.grupo_familiar_id ?? null
+  const grupoCambio = nuevoGrupoId !== grupoAnterior
+  const ordenHermano = grupoCambio
+    ? await calcularOrdenHermano(supabase, nuevoGrupoId, id)
+    : (actual?.orden_hermano ?? 1)
+
+  const nuevaTipoCuota = (formData.get('tipo_cuota') as TipoCuota) || 'mensual'
+  const tipoCuotaCambio = nuevaTipoCuota !== (actual?.tipo_cuota ?? 'mensual')
 
   const { error } = await supabase
     .from('beneficiarios')
@@ -73,11 +111,22 @@ export async function updateBeneficiario(id: string, formData: FormData) {
       religion: (formData.get('religion') as string) || null,
       rama: ramaNueva,
       fecha_ingreso: formData.get('fecha_ingreso') as string,
-      tipo_cuota: (formData.get('tipo_cuota') as TipoCuota) || 'mensual',
+      tipo_cuota: nuevaTipoCuota,
+      grupo_familiar_id: nuevoGrupoId,
+      orden_hermano: ordenHermano,
       activo: formData.get('activo') !== 'false',
     })
     .eq('id', id)
   if (error) dbError(error)
+
+  // Si cambió el tipo de cuota, eliminar cuotas pendientes para regenerar en el próximo cron
+  if (tipoCuotaCambio) {
+    await supabase
+      .from('cuotas_pendientes')
+      .delete()
+      .eq('beneficiario_id', id)
+      .eq('estado', 'pendiente')
+  }
 
   if (ramaAnteriorRaw && ramaAnteriorRaw !== ramaNueva) {
     await supabase.from('historial_rama').insert({
@@ -398,10 +447,21 @@ export async function updateCuota(formData: FormData) {
     .single()
   if (userData?.rol !== 'admin') throw new Error('Solo los administradores pueden configurar la cuota')
 
-  const montoTrimestralMes = formData.get('monto_trimestral_mes') as string
+  const n = (key: string) => {
+    const v = formData.get(key) as string
+    return v ? parseFloat(v) : null
+  }
   const { error } = await supabase.from('cuota_config').insert({
     monto: parseFloat(formData.get('monto') as string),
-    monto_trimestral_mes: montoTrimestralMes ? parseFloat(montoTrimestralMes) : null,
+    monto_hermano1: n('monto_hermano1'),
+    monto_hermano2: n('monto_hermano2'),
+    monto_trimestral_mes: n('monto_trimestral_mes'),
+    monto_semestral1: n('monto_semestral1'),
+    monto_semestral1_hermano1: n('monto_semestral1_hermano1'),
+    monto_semestral1_hermano2: n('monto_semestral1_hermano2'),
+    monto_semestral2: n('monto_semestral2'),
+    monto_semestral2_hermano1: n('monto_semestral2_hermano1'),
+    monto_semestral2_hermano2: n('monto_semestral2_hermano2'),
     descripcion: (formData.get('descripcion') as string) || null,
   })
   if (error) dbError(error)
@@ -454,6 +514,38 @@ export async function enviarEmailCuotaVencida(cuotaId: string, protagonistaId: s
   const enviado = await enviarVencimientoCuota(protagonista, cp)
   if (!enviado) throw new Error('No se pudo enviar el email (sin dirección de correo)')
 }
+
+// ============================================================
+// GRUPOS FAMILIARES
+// ============================================================
+
+export async function createGrupoFamiliar(formData: FormData) {
+  const supabase = await createServerClient()
+  const { error } = await supabase
+    .from('grupos_familiares')
+    .insert({
+      nombre: formData.get('nombre') as string,
+      apellido_familia: formData.get('apellido_familia') as string,
+      telefono_contacto: (formData.get('telefono_contacto') as string) || null,
+      email_contacto: (formData.get('email_contacto') as string) || null,
+      direccion: (formData.get('direccion') as string) || null,
+      barrio: (formData.get('barrio') as string) || null,
+    })
+  if (error) dbError(error)
+  revalidatePath('/admin/grupos-familiares')
+  revalidatePath('/protagonistas')
+  redirect('/admin/grupos-familiares')
+}
+
+export async function deleteGrupoFamiliar(id: string) {
+  const supabase = await createServerClient()
+  const { error } = await supabase.from('grupos_familiares').delete().eq('id', id)
+  if (error) dbError(error)
+  revalidatePath('/admin/grupos-familiares')
+  revalidatePath('/protagonistas')
+  redirect('/admin/grupos-familiares')
+}
+
 
 // ============================================================
 // BLOG
