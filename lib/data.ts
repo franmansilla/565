@@ -184,6 +184,18 @@ export async function getProximoCampamento() {
   return data || null
 }
 
+export async function getInscripcionesPorCampamento(): Promise<Record<string, number>> {
+  const supabase = await createServerClient()
+  const { data } = await supabase
+    .from('inscripciones_campamento')
+    .select('campamento_id')
+  if (!data) return {}
+  return data.reduce((acc: Record<string, number>, row: { campamento_id: string }) => {
+    acc[row.campamento_id] = (acc[row.campamento_id] || 0) + 1
+    return acc
+  }, {})
+}
+
 // ============================================================
 // MESES ACTIVOS
 // ============================================================
@@ -656,4 +668,92 @@ export async function getBlogPostPublic(slug: string) {
     .eq('publicado', true)
     .single()
   return data
+}
+
+// ============================================================
+// PAGOS — dashboard stats
+// ============================================================
+
+export async function getPagosStats(mes: number, anio: number) {
+  const supabase = await createServerClient()
+
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const primerDia = `${anio}-${pad(mes)}-01`
+  const diasMes = new Date(anio, mes, 0).getDate()
+  const ultimoDia = `${anio}-${pad(mes)}-${pad(diasMes)}`
+
+  const mesAnt = mes === 1 ? 12 : mes - 1
+  const anioAnt = mes === 1 ? anio - 1 : anio
+  const primerDiaAnt = `${anioAnt}-${pad(mesAnt)}-01`
+  const ultimoDiaAnt = `${anioAnt}-${pad(mesAnt)}-${pad(new Date(anioAnt, mesAnt, 0).getDate())}`
+
+  const [pagosMesRes, pagosAntRes, cuotasPendRes, activosRes] = await Promise.all([
+    supabase.from('pagos').select('id, monto, beneficiario_id, concepto')
+      .gte('fecha_pago', primerDia).lte('fecha_pago', ultimoDia),
+    supabase.from('pagos').select('monto')
+      .gte('fecha_pago', primerDiaAnt).lte('fecha_pago', ultimoDiaAnt),
+    supabase.from('cuotas_pendientes')
+      .select('monto, estado, beneficiario_id, beneficiarios(id, nombre, apellido, rama)')
+      .in('estado', ['pendiente', 'vencido']),
+    supabase.from('beneficiarios').select('id').eq('activo', true),
+  ])
+
+  const pagosMes = pagosMesRes.data || []
+  const cobradoMes = pagosMes.reduce((s, p) => s + Number(p.monto), 0)
+  const cobradoAnt = (pagosAntRes.data || []).reduce((s, p) => s + Number(p.monto), 0)
+  const variacion = cobradoAnt > 0 ? ((cobradoMes - cobradoAnt) / cobradoAnt) * 100 : 0
+  const cuotasMesPagadas = new Set(pagosMes.map(p => p.beneficiario_id)).size
+  const totalActivos = activosRes.data?.length ?? 0
+  const fondoCamp = pagosMes
+    .filter(p => (p.concepto || '').toLowerCase().includes('campamento'))
+    .reduce((s, p) => s + Number(p.monto), 0)
+
+  const cuotasPend = cuotasPendRes.data || []
+  const pendienteTotal = cuotasPend.reduce((s, p) => s + Number(p.monto), 0)
+
+  const morososMap = new Map<string, { id: string; nombre: string; apellido: string; rama: string; monto: number; cuotas: number }>()
+  for (const cp of cuotasPend) {
+    const b = cp.beneficiarios as unknown as { id: string; nombre: string; apellido: string; rama: string } | null
+    if (!b || Array.isArray(b)) continue
+    if (!morososMap.has(b.id)) morososMap.set(b.id, { id: b.id, nombre: b.nombre, apellido: b.apellido, rama: b.rama, monto: 0, cuotas: 0 })
+    const e = morososMap.get(b.id)!
+    e.monto += Number(cp.monto)
+    e.cuotas += 1
+  }
+  const morosos = Array.from(morososMap.values()).sort((a, b) => b.monto - a.monto).slice(0, 6)
+
+  return { cobradoMes, variacion, cuotasMesPagadas, totalActivos, pendienteTotal, fondoCamp, morosos }
+}
+
+export async function getFlujoMensual(anio: number) {
+  const supabase = await createServerClient()
+  const { data } = await supabase
+    .from('pagos')
+    .select('monto, fecha_pago, concepto')
+    .gte('fecha_pago', `${anio}-01-01`)
+    .lte('fecha_pago', `${anio}-12-31`)
+
+  const flujo: Record<number, { cuotas: number; campamentos: number }> = {}
+  for (let m = 1; m <= 12; m++) flujo[m] = { cuotas: 0, campamentos: 0 }
+
+  for (const p of data || []) {
+    const m = new Date(p.fecha_pago + 'T00:00:00').getMonth() + 1
+    const monto = Number(p.monto)
+    const concepto = (p.concepto || '').toLowerCase()
+    if (concepto.includes('campamento')) flujo[m].campamentos += monto
+    else flujo[m].cuotas += monto
+  }
+  return flujo
+}
+
+export async function getUltimosPagosDetallados(limite = 10) {
+  const supabase = await createServerClient()
+  const { data, error } = await supabase
+    .from('pagos')
+    .select('*, beneficiarios(id, nombre, apellido, rama)')
+    .order('fecha_pago', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limite)
+  if (error) dbError(error)
+  return data || []
 }

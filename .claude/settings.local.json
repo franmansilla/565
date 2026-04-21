@@ -24,7 +24,26 @@
       "Bash(curl:*)",
       "Bash(ls:*)",
       "Bash(ls /Users/franciscomansilla/Desktop/565/app/\\\\\\(admin\\\\\\)/admin/grupos-familiares/nuevo/)",
-      "Bash(ls /Users/franciscomansilla/Desktop/565/app/\\\\\\(admin\\\\\\)/admin/grupos-familiares/[id]/)"
+      "Bash(ls /Users/franciscomansilla/Desktop/565/app/\\\\\\(admin\\\\\\)/admin/grupos-familiares/[id]/)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(cp webfetch-1776718342338-9ig61o.bin design.tar.gz)",
+      "Bash(tar -tzf design.tar.gz)",
+      "Bash(gunzip -c webfetch-1776718342338-9ig61o.bin)",
+      "Read(//private/tmp/**)",
+      "Bash(tar -xzf /Users/franciscomansilla/.claude/projects/-Users-franciscomansilla-Desktop-565/49425a08-101a-4165-9fe5-1f1d43c13980/tool-results/design.tar.gz)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(npm run *)",
+      "Bash(mkdir -p /tmp/design_shared)",
+      "Bash(cp \"/Users/franciscomansilla/.claude/projects/-Users-franciscomansilla-Desktop-565/49425a08-101a-4165-9fe5-1f1d43c13980/tool-results/webfetch-1776739314045-qp1q8f.bin\" /tmp/design_shared/archive.gz)",
+      "Read(//tmp/**)",
+      "Bash(tar -xzf archive.gz)",
+      "Bash(cp \"/Users/franciscomansilla/.claude/projects/-Users-franciscomansilla-Desktop-565/49425a08-101a-4165-9fe5-1f1d43c13980/tool-results/webfetch-1776741566393-w4qqay.bin\" /tmp/pagos_design.gz)",
+      "Bash(mkdir -p /tmp/pagos_extract)",
+      "Bash(tar -xzf /tmp/pagos_design.gz)",
+      "Bash(cp \"/Users/franciscomansilla/.claude/projects/-Users-franciscomansilla-Desktop-565/49425a08-101a-4165-9fe5-1f1d43c13980/tool-results/webfetch-1776743654486-vkxwd9.bin\" /tmp/camp.gz)",
+      "Bash(mkdir -p camp_ext)",
+      "Bash(tar -xzf camp.gz -C camp_ext)"
     ]
   }
 }

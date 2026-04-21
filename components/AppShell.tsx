@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getCurrentUserRole } from '@/lib/data'
 import { Sidebar } from './Sidebar'
+import { TopBar } from './TopBar'
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = await createServerClient()
@@ -16,11 +17,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 overflow-hidden">
       <Sidebar isAdmin={isAdmin} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto px-6 py-6 lg:px-8 lg:py-8">
-          {children}
-        </div>
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar userEmail={user.email} />
+        <main className="flex-1 overflow-y-auto" style={{ background: '#f9f9ff' }}>
+          <div className="px-10 py-6">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

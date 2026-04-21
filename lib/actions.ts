@@ -630,3 +630,15 @@ export async function marcarMensajeLeido(id: string) {
   await supabase.from('mensajes_contacto').update({ leido: true }).eq('id', id)
   revalidatePath('/admin/blog')
 }
+
+export async function quickSearchProtagonistas(query: string) {
+  if (!query.trim()) return []
+  const supabase = await createServerClient()
+  const { data } = await supabase
+    .from('beneficiarios')
+    .select('id, nombre, apellido, dni, rama, activo')
+    .or(`nombre.ilike.%${query}%,apellido.ilike.%${query}%,dni.ilike.%${query}%`)
+    .order('apellido', { ascending: true })
+    .limit(6)
+  return data ?? []
+}
